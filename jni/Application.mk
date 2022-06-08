@@ -1,0 +1,1 @@
+Application.mk.arm32
