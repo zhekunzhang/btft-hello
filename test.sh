@@ -3,7 +3,7 @@ if [[ $# -lt 1 ]]
 then
     clear
     echo "下载hello project 示例  并配置环境"
-    echo "./test.sh hello"
+    echo "./test.sh hello.c"
     echo ""
     echo ""
     echo "generate apk"
@@ -70,6 +70,7 @@ build_apk_type()
         switch_abi link
         cd $project_name/gradle_src
         rm -rf build&&rm -rf libs&&rm -rf obj
+        echo "ready build ..."
         gradle build   > /dev/null
         cd "build/outputs/apk"
         cp *debug.apk $curpath
@@ -115,6 +116,29 @@ run_btft_case()
 
 }
 
+sedproject()
+{
+        git clone https://github.com/zhekunzhang/btft_hello.git 
+        config_gradle
+        cp "$1" btft_hello/gradle_src/jni
+        btftname=`echo $1|gawk -F\. '{print $1}'`
+        sed -i "s/hello/$btftname/g"  btft_hello/gradle_src/jni/test.cpp
+        sed -i "s/hello/$btftname/g"  btft_hello/gradle_src/jni/Android.mk
+        sed -i "s/hello/$btftname/g"  btft_hello/gradle_src/AndroidManifest.xml
+        sed -i "s/hello/$btftname/g"  btft_hello/gradle_src/src/com/intel/btft/hello/hello.java
+        sed -i "s/hello/$btftname/g"  btft_hello/gradle_src/src/com/intel/btft/hello/testFTest.java
+        sed -i "s/hello/$btftname/g"  btft_hello/gradle_src/settings.gradle
+        functionname=`cat "$1" |grep "()"|gawk  '{print $2}'|gawk -F\( '{print $1}' ` 
+        sed -i "s/btftmain/$functionname/g"  btft_hello/gradle_src/jni/test.cpp
+        sed -i "s/btftmain/$functionname/g"  btft_hello/gradle_src/src/com/intel/btft/hello/hello.java
+        mv btft_hello/gradle_src/src/com/intel/btft/hello/hello.java btft_hello/gradle_src/src/com/intel/btft/hello/$btftname.java
+        mv btft_hello/gradle_src/src/com/intel/btft/hello btft_hello/gradle_src/src/com/intel/btft/$btftname
+         mv btft_hello/ btft_$btftname
+
+
+}
+
+
 
 until [[ -z "$1" ]]
 do
@@ -123,10 +147,9 @@ do
         echo "Please check input parms"
         exit 2
     fi
-    if [[ "$1" == "hello" ]]
+    if [[ "$1" =~ ".c" ]]
     then
-        git clone https://github.com/zhekunzhang/btft_hello.git 
-        config_gradle
+        sedproject $1
         break
     elif [[ "$1" == "-n" ]]
     then
