@@ -4,6 +4,7 @@ then
     clear
     echo "下载hello project 示例  并配置环境"
     echo "./test.sh hello.c"
+    echo "./test.sh [projectname].c"
     echo ""
     echo ""
     echo "generate apk"
@@ -119,7 +120,11 @@ run_btft_case()
 sedproject()
 {
         git clone https://github.com/zhekunzhang/btft_hello.git 
-        config_gradle
+       
+        if [[ $1 == "hello.c" ]];then 
+                config_gradle
+                exit 0
+        fi
         cp "$1" btft_hello/gradle_src/jni
         btftname=`echo $1|gawk -F\. '{print $1}'`
         sed -i "s/hello/$btftname/g"  btft_hello/gradle_src/jni/test.cpp
