@@ -28,7 +28,7 @@ curpath=$PWD
 config_gradle()
 {
     cd /home/test/bin
-    cat ~/.bashrc|grep gradle-2.2
+    cat ~/.bashrc|grep gradle-2.2 >/dev/null
     if [ $? != 0 ];then
         echo "export PATH=/home/test/bin/gradle-2.2/bin:\$PATH">>~/.bashrc
     fi
