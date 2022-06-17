@@ -22,6 +22,9 @@ then
 
 fi
 
+#Application.mk.aarch64 存在abi不一致
+
+
 count=0
 curpath=$PWD
 config_gradle()
@@ -69,7 +72,6 @@ switch_abi()
 
 sourcesrc()
 {
-genenv
 #ready for the bashrc of differnt version 
 ndkversion=`cat ndk_config|grep :|head -n 1|awk -F 'r'  '{print$2}'`
 if [[ $ndkversion =~ 10 ]];then
