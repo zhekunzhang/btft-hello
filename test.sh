@@ -3,32 +3,31 @@ if [[ $# -lt 1 ]]
 then
     clear
     echo "下载hello project 示例  并配置环境"
-    echo "./test.sh hello.c"
-    echo "./test.sh [projectname].c"
+    echo "  ./test.sh hello.c"
+    echo "  ./test.sh [projectname].c"
     echo ""
     echo ""
     echo "generate apk"
-    echo "./test.sh -n [btft_hello]  -a [arm32/64/x86/x64] "
-    echo ""
-    echo ""
-    echo "run all case"
-    echo "./test.sh -n  btft_hello -a arm32  -r all"
+    echo "  ./test.sh -n [btft_hello]  -a [ arm32/arm64/x86/x64 ] "
     echo ""
     echo ""
     echo "run one subcase"
-    echo "./test.sh -n  btft_aeabitest -a arm32  -r AeabiMemset4Test"
+    echo "  ./test.sh -n  btft_aeabitest -a arm32  -r AeabiMemset4Test"
     echo ""
     echo ""
+    echo "run all case"
+    echo "  ./test.sh -n  btft_hello -a arm32  -r all"
+    echo ""
+    echo "替换ndk    source  ./test.sh -n  btft_hello -a arm32  -r all"
 
 fi
 
 count=0
 curpath=$PWD
-
 config_gradle()
 {
     cd /home/test/bin
-    cat ~/.bashrc|grep gradle-2.2 >/dev/null
+    cat ~/.bashrc|grep gradle-2.2> /dev/null
     if [ $? != 0 ];then
         echo "export PATH=/home/test/bin/gradle-2.2/bin:\$PATH">>~/.bashrc
     fi
@@ -66,10 +65,33 @@ switch_abi()
         fi
         cd "$curpath"
 }
+
+
+sourcesrc()
+{
+genenv
+#ready for the bashrc of differnt version 
+ndkversion=`cat ndk_config|grep :|head -n 1|awk -F 'r'  '{print$2}'`
+if [[ $ndkversion =~ 10 ]];then
+source   ~/.bashrc10
+elif [[ $ndkversion =~ 14 ]];then
+source   ~/.bashrc14
+elif [[ $ndkversion =~ 20 ]];then
+source   ~/.bashrc20
+elif [[ $ndkversion =~ 21 ]];then
+source   ~/.bashrc21
+elif [[ "$ndkversion" =~ 22 ]];then
+source   ~/.bashrc22
+fi
+echo $NDK_VERSION
+echo "This project use ndk $ndkversion"
+}
+
 build_apk_type()
 {
         switch_abi link
         cd $project_name/gradle_src
+        sourcesrc
         rm -rf build&&rm -rf libs&&rm -rf obj
         echo "ready build ..."
         gradle build   > /dev/null
@@ -81,12 +103,12 @@ build_apk_type()
 
 run_btft()
 {
-    adb -s emulator-5554 shell -n am instrument -w -e class com.intel.btft.$package_name.$package_name\#$1 com.intel.btft.$package_name/android.test.InstrumentationTestRunner> /dev/null
+    adb -s emulator-5554 shell -n am instrument -w -e class $package_name\#$1 $package_name/android.test.InstrumentationTestRunner> /dev/null
     if [[ $? == 0  ]]
-        then 
-        echo "$1 run pass"
-        else
-        echo "$1 run fail"
+    then 
+    echo "$1 run pass"
+    else
+    echo "$1 run fail"
     fi
 
 }
@@ -162,7 +184,13 @@ do
         rm $apk_name*.apk
         apk_name=$1
         project_name=$1
-        package_name=`echo $apk_name|gawk -F\_ '{print $2}'` 
+        package_name=`cat $project_name/gradle_src/AndroidManifest.xml|grep package|head -n 1|awk -F 'package' '{print $2}'|awk -F '"' '{print $2}' ` 
+        shift
+    elif [[ "$1" == "-a" ]]
+    then
+        shift
+        switch_abi $1
+        build_apk_type $1
         shift
     elif [[ "$1" == "-r" ]]
     then
@@ -174,14 +202,8 @@ do
             run_btft_case $1  
         fi
         shift
-    elif [[ "$1" == "-a" ]]
-    then
-        shift
-        switch_abi $1
-        build_apk_type $1
-        shift
     fi
 done
 if [[ "$package_name" != ""  ]];then
-    adb -s emulator-5554 uninstall com.intel.btft.$package_name
+    adb -s emulator-5554 uninstall $package_name
 fi
