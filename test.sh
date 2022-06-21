@@ -1,4 +1,5 @@
 #ll!/bin/bash
+#set -x 
 if [[ $# -lt 1 ]]
 then
     clear
@@ -105,7 +106,7 @@ build_apk_type()
 
 run_btft()
 {
-    adb -s emulator-5554 shell -n am instrument -w -e class $package_name\#$1 $package_name/android.test.InstrumentationTestRunner> /dev/null
+    adb -s emulator-5554 shell -n am instrument -w -e class $package_name.$2\#$1 $package_name/android.test.InstrumentationTestRunner> /dev/null
     if [[ $? == 0  ]]
     then 
     echo "$1 run pass"
@@ -125,19 +126,50 @@ run_btft_case()
         fi
         echo $apkname
         cd $curpath
-        adb -s emulator-5554 install $apkname
+        adb -s emulator-5554 install -r  $apkname
 
         if [[ "$1" == all  ]]
         then
-            cat  $apk_name/gradle_src/jni/test.cpp |grep BTFT> /tmp/btft
-            for line in `cat /tmp/btft`
-            do
-                        casename=`echo $line|gawk -F\, '{print $2}'|gawk -F\) '{print $1}'`
-                        run_btft $casename
-            done    
+#            if [[ -f $apk_name/gradle_src/jni/test.cpp  ]];then
+#                cat  $apk_name/gradle_src/jni/test.cpp |grep BTFT> /tmp/btft
+#                for line in `cat /tmp/btft`
+#                do
+#                        casename=echo $line|gawk -F\, '{print $2}'|gawk -F\) '{print $1}'
+#                        run_btft $casename
+#                 done    
+#            else
+                 rm /tmp/tmpcase
+                 cat `ls $apk_name/test/arm32/*xml|head -n 1`|grep TestCase >>/tmp/tmpcase      
+                  #处理
+                 for line in `cat /tmp/tmpcase`
+                  do
+                  if [[ $line =~ 'className=' ]];
+                  then
+                   echo  -n "$line">>/tmp/tmpcase2
+                  fi
+                  if [[ $line =~ 'test=' ]];
+                  then
+                  echo   $line>>/tmp/tmpcase2
+                  fi
+                  done
+
+                 cat /tmp/tmpcase2
+                 cat /tmp/tmpcase2
+                 for line in `cat /tmp/tmpcase2`
+                 do
+                 classname=`echo $line |awk -F 'className' '{print $2}'|awk -F '"' '{print $2}'`                                               
+                 casename=`echo $line|awk -F 'test=' '{print $2}'|awk -F '"' '{print $2}'`                                                 
+
+                 run_btft $casename $classname
+
+
+                 done
+#            fi
         else
             run_btft $1
         fi
+        rm /tmp/tmpcase
+        rm /tmp/tmpcase2
 
 }
 
