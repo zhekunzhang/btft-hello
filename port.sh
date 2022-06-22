@@ -38,7 +38,7 @@ function createdir
     done
 }
 
-
+cd /tmp ;git clone https://github.com/zhekunzhang/btft_hello.git;cd -
 divdir
 createdir
 
