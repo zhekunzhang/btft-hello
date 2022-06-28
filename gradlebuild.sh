@@ -1,29 +1,31 @@
-#ll!/bin/bash
+#!/bin/bash
 #set -x 
 if [[ $# -lt 1 ]]
 then
     clear
     echo "下载hello project 示例  并配置环境"
-    echo "  ./test.sh hello.c"
-    echo "  ./test.sh [projectname].c"
+    echo "  ./gradlebuild.sh hello.c"
+    echo "  ./gradlebuild.sh [projectname].c"
+    echo ""
     echo ""
     echo ""
     echo "generate apk"
-    echo "  ./test.sh -n [btft_hello]  -a [ arm32/arm64/x86/x64 ] "
+    echo "  ./gradlebuild.sh  -a ( arm32 / arm64 /x86 / x64 ) -t  btft_hello"
     echo ""
-    echo ""
-    echo "run one subcase"
-    echo "  ./test.sh -n  btft_aeabitest -a arm32  -r AeabiMemset4Test"
-    echo ""
+    echo "run one case"
+    echo "  ./gradlebuild.sh  -a arm32  -t  btft_aeabitest   -r AeabiMemset4Test"
     echo ""
     echo "run all case"
-    echo "  ./test.sh -n  btft_hello -a arm32  -r all"
+    echo "  ./gradlebuild.sh  -a arm32  -r all -t btft_hello"
     echo ""
-    echo "替换ndk    source  ./test.sh -n  btft_hello -a arm32  -r all"
-
+    echo "run subdir case"
+    echo "  ./gradlebuild.sh  -a arm32  -r all -t btft_libcExtension  -s ext01 "
+    echo ""
+    echo ""
+    echo ""
+    echo "替换ndk    source  ./gradlebuild.sh -t  btft_hello -a arm32  -r all"
+exit
 fi
-
-#Application.mk.aarch64 存在abi不一致
 
 
 count=0
@@ -31,7 +33,7 @@ curpath=$PWD
 config_gradle()
 {
     cd /home/test/bin
-    cat ~/.bashrc|grep gradle-2.2> /dev/null
+    cat ~/.bashrc|grep gradle-2.2> /dev/null 2>&1
     if [ $? != 0 ];then
         echo "export PATH=/home/test/bin/gradle-2.2/bin:\$PATH">>~/.bashrc
     fi
@@ -51,21 +53,20 @@ switch_abi()
           exit 1
         fi
         if [ "$1" == "arm32" ]; then
-            abi="arm32"
+            abi_type="arm32"
         elif [ "$1" == "arm64" ]; then
-            abi="aarch64"
+            abi_type="aarch64"
         elif [ "$1" == "x86" ]; then
-            abi="x86"
+            abi_type="x86"
         elif  [ "$1" == "x86_64" ]; then
-            abi="x86_64"
+            abi_type="x86_64"
         elif [ "$1" == "link" ];then
-            path1="/gradle_src/jni/"
-            cd $project_name$path1
+            cd $projectsrc_name/jni
             if [[ $? != 0 ]];then
                   echo "please check project name"
                      exit 2
             fi
-            ln -sf "Application.mk."$abi   Application.mk
+            ln -sf "Application.mk."$abi_type   Application.mk
         fi
         cd "$curpath"
 }
@@ -74,7 +75,16 @@ switch_abi()
 sourcesrc()
 {
 #ready for the bashrc of differnt version 
+cd $curpath/$apk_name/gradle_src
+if [[ -f ndk_config ]];
+then
 ndkversion=`cat ndk_config|grep :|head -n 1|awk -F 'r'  '{print$2}'`
+else
+cd $curpath/$apk_name/gradle_src/$subdir
+ndkversion=`cat ndk_config|grep :|head -n 1|awk -F 'r'  '{print$2}'`
+fi
+
+echo $ndkversion
 if [[ $ndkversion =~ 10 ]];then
 source   ~/.bashrc10
 elif [[ $ndkversion =~ 14 ]];then
@@ -93,20 +103,31 @@ echo "This project use ndk $ndkversion"
 build_apk_type()
 {
         switch_abi link
-        cd $project_name/gradle_src
         sourcesrc
+        cd $curpath/$apk_name/gradle_src
+        if [[ -f AndroidManifest.xml  ]];then        
+        echo `pwd`
+        else
+        cd $curpath/$apk_name/gradle_src/$subdir
+        fi
         rm -rf build&&rm -rf libs&&rm -rf obj
         echo "ready build ..."
-        gradle build   > /dev/null
+        gradle build   > /dev/null 2>&1
+        ls
         cd "build/outputs/apk"
         cp *debug.apk $curpath
-        cd "$curpath";cd $project_name;rm -rf build&&rm -rf libs&&rm -rf obj
+        if [[ -d $curpath/$apk_name/test/$abi_type/apk ]];then
+        cp *debug.apk  $curpath/$apk_name/test/$abi_type/apk
+        else
+        cp *debug.apk  $curpath/$apk_name/test/$abi_type/$subdir/apk
+        fi
+        cd "$curpath";#cd $projectsrc_name;rm -rf build&&rm -rf libs&&rm -rf obj
         cd "$curpath"
 }
 
 run_btft()
 {
-    adb -s emulator-5554 shell -n am instrument -w -e class $package_name.$2\#$1 $package_name/android.test.InstrumentationTestRunner> /dev/null
+    adb -s emulator-5554 shell -n am instrument -w -e class $package_name.$2\#$1 $package_name/android.test.InstrumentationTestRunner> /dev/null 2>&1
     if [[ $? == 0  ]]
     then 
     echo "$1 run pass"
@@ -118,15 +139,15 @@ run_btft()
 
 run_btft_case()
 {
-        cd $curpath
-        apkname=`ls "$apk_name"*.apk`
+        if [[ "$subdir"  ]];then
+            cd $apk_name/test/$abi_type/$subdir/apk;adb -s emulator-5554 install -r  `ls *debug.apk` >/dev/null 2>&1
+        else
+        cd $apk_name/test/$abi_type/apk;adb -s emulator-5554 install -r  `ls *debug.apk` >/dev/null 2>&1        
         if [[ $? != 0 ]];then
                 echo "Please generate apk first"
                 exit 2
         fi
-        echo $apkname
-        cd $curpath
-        adb -s emulator-5554 install -r  $apkname
+        fi
 
         if [[ "$1" == all  ]]
         then
@@ -138,8 +159,19 @@ run_btft_case()
 #                        run_btft $casename
 #                 done    
 #            else
-                 rm /tmp/tmpcase
-                 cat `ls $apk_name/test/arm32/*xml|head -n 1`|grep TestCase >>/tmp/tmpcase      
+                 rm /tmp/tmpcase > /dev/null 2>&1
+                 if [[  "$subdir" ]];then 
+                 cd $curpath                 
+                 cat `ls $apk_name/test/$abi_type/$subdir/*xml|head -n 1`|grep TestCase >>/tmp/tmpcase      
+                 elif [[ -z "$subdir"  ]];then
+                 cd $curpath;
+                 cat `ls $apk_name/test/$abi_type/*xml|head -n 1`|grep TestCase >>/tmp/tmpcase
+                 if [[ -d $project_name  ]];then
+                 cat `ls $project_name/*xml|head -n 1`|grep TestCase >>/tmp/tmpcase      
+                 else
+                 cat `ls $project_name/../aarch64/*xml|head -n 1`|grep TestCase >>/tmp/tmpcase      
+                 fi
+                 fi
                   #处理
                  for line in `cat /tmp/tmpcase`
                   do
@@ -152,9 +184,11 @@ run_btft_case()
                   echo   $line>>/tmp/tmpcase2
                   fi
                   done
-
-                 cat /tmp/tmpcase2
-                 cat /tmp/tmpcase2
+                 echo "============================="
+                 echo "RUN SUBCASE RESULT "
+                 echo "============================="
+                 echo ""
+                 echo ""
                  for line in `cat /tmp/tmpcase2`
                  do
                  classname=`echo $line |awk -F 'className' '{print $2}'|awk -F '"' '{print $2}'`                                               
@@ -168,8 +202,8 @@ run_btft_case()
         else
             run_btft $1
         fi
-        rm /tmp/tmpcase
-        rm /tmp/tmpcase2
+        rm /tmp/tmpcase >/dev/null 2>&1
+        rm /tmp/tmpcase2 > /dev/null 2>&1
 
 }
 
@@ -201,43 +235,75 @@ sedproject()
 
 
 
+if  [[ "$1" =~ ".c" ]];then
+sedproject $1
+exit
+fi
+
+
 until [[ -z "$1" ]]
 do
-    count=$(($count+1))
-    if [ $count -gt 20 ];then 
-        echo "Please check input parms"
-        exit 2
-    fi
-    if [[ "$1" =~ ".c" ]]
-    then
-        sedproject $1
-        break
-    elif [[ "$1" == "-n" ]]
+    if [[ "$1" == "-t" ]]
     then
         shift
-        rm $apk_name*.apk
         apk_name=$1
         project_name=$1
-        package_name=`cat $project_name/gradle_src/AndroidManifest.xml|grep package|head -n 1|awk -F 'package' '{print $2}'|awk -F '"' '{print $2}' ` 
         shift
     elif [[ "$1" == "-a" ]]
     then
         shift
-        switch_abi $1
-        build_apk_type $1
+        abitype=$1 
         shift
     elif [[ "$1" == "-r" ]]
     then
         shift
-        if [[ "$1" == "all"  ]];then
-            #run_btft_case $project_name
-            run_btft_case all 
+        if [[ "$1" == "all"  ]];then 
+        runcase="runall"
         else
-            run_btft_case $1  
+        runcase="$1"
         fi
+        shift
+    elif [[ "$1" == "-s" ]]
+    then
+        shift
+        subdir=$1
+        shift
+    elif [[ "$1" == "-b" ]]
+    then
+        shift
+        branch=$1
         shift
     fi
 done
-if [[ "$package_name" != ""  ]];then
-    adb -s emulator-5554 uninstall $package_name
+
+switch_abi $abitype
+rm $apk_name*.apk
+if [[ "$subdir" ]];then 
+tmpdirname=$project_name
+project_name="$tmpdirname/test/$abi_type/$subdir"
+projectsrc_name="$tmpdirname/gradle_src/$subdir"
+else
+tmpdirname=$project_name
+project_name="$tmpdirname/test/$abi_type"
+projectsrc_name="$tmpdirname/gradle_src"
 fi
+echo `pwd`
+echo "$projectsrc_name"
+package_name=`cat $projectsrc_name/AndroidManifest.xml|grep package|head -n 1|awk -F 'package'     '{print $2}'|awk -F '"' '{print $2}' ` 
+if [[ $? != 0 ]];then 
+echo "\n\n\n\n pelease input subdir"
+ls $project_name
+exit
+fi
+adb -s emulator-5554 uninstall $package_name >/dev/null
+switch_abi link
+build_apk_type $abitype
+if [[ "$runcase" == "runall"  ]];then
+run_btft_case all
+else
+run_btft_case $runcase
+fi
+if [[ "$package_name" != ""  ]];then
+    adb -s emulator-5554 uninstall $package_name >/dev/null
+fi
+cd $curpath;rm *.apk
