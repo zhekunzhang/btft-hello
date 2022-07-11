@@ -127,7 +127,9 @@ build_apk_type()
 
 run_btft()
 {
-    adb -s emulator-5554 shell -n am instrument -w -e class $package_name.$2\#$1 $package_name/android.test.InstrumentationTestRunner> /dev/null 2>&1
+#adb -s emulator-5554 shell -n am instrument -w -e class $package_name.$2\#$1 $package_name/android.test.InstrumentationTestRunner> /dev/null 2>&1
+    adb -s emulator-5554 shell -n am instrument -w -e class $package_name.$2\#$1 $package_name/android.test.InstrumentationTestRunner> /tmp/result
+    cat  /tmp/result|  grep 'OK' >& /dev/null        
     if [[ $? == 0  ]]
     then 
     echo "$1 run pass"
